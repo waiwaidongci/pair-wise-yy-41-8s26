@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from .domain import (ConflictError, DomainError, NotFoundError, PermissionDenied,
-                     ValidationError)
+from .domain import (BatchRejected, ConflictError, DomainError, NotFoundError,
+                     PermissionDenied, ValidationError)
 from .service import Service
 
 
@@ -57,6 +57,9 @@ def make_handler(service: Service, static_dir: str):
             return value
 
         def _send_error(self, exc: Exception) -> None:
+            if isinstance(exc, BatchRejected):
+                self._json(409, exc.to_payload())
+                return
             if isinstance(exc, ValidationError):
                 status = 422
             elif isinstance(exc, NotFoundError):
@@ -89,6 +92,11 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"records": service.list_records(item_id, role)})
+                elif path.startswith("/api/items/") and path.endswith("/batches"):
+                    item_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"batches": service.list_batches(item_id, role)})
                 elif path.startswith("/api/items/"):
                     item_id = int(path.rsplit("/", 1)[-1])
                     actor, role = self._identity()
@@ -113,12 +121,19 @@ def make_handler(service: Service, static_dir: str):
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/batches"):
+                    item_id = int(path.split("/")[3])
+                    self._json(200, service.ingest_batch(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/revoke-notice"):
+                    item_id = int(path.split("/")[3])
+                    self._json(200, service.revoke_notice(item_id, body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/transition"):
                     item_id = int(path.split("/")[3])
                     target = body.get("target")
                     expected = body.get("expected_version")
                     self._json(200, service.transition(
-                        item_id, target, expected, actor, role))
+                        item_id, target, expected, actor, role,
+                        body.get("notice_ref")))
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:

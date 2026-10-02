@@ -10,6 +10,13 @@ class ValidationError(DomainError): kind=ErrorKind.VALIDATION
 class NotFoundError(DomainError): kind=ErrorKind.NOT_FOUND
 class PermissionDenied(DomainError): kind=ErrorKind.FORBIDDEN
 class ConflictError(DomainError): kind=ErrorKind.CONFLICT
+class BatchRejected(ConflictError):
+    kind=ErrorKind.CONFLICT
+    def __init__(self,message,reason=None,conflicts=None,missing=None):
+        super().__init__(message); self.reason=reason; self.conflicts=conflicts or []; self.missing=missing or []
+    def to_payload(self):
+        return {"error":self.__class__.__name__,"message":self.message,"reason":self.reason,
+                "conflicts":self.conflicts,"missing":self.missing}
 SEVERITIES=['normal', 'watch', 'warning', 'critical']; STATES=['normal', 'warning', 'restricted', 'closed', 'restored']; ROLES=['sensor_operator', 'bridge_engineer', 'traffic_authority', 'viewer']
 @dataclass(frozen=True)
 class Item:
