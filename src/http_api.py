@@ -110,15 +110,23 @@ def make_handler(service: Service, static_dir: str):
                 body = self._body()
                 if path == "/api/items":
                     self._json(201, service.create_item(body, actor, role))
+                elif path == "/api/gateway/batches":
+                    self._json(201, service.receive_gateway_batch(body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and "/records/" in path and path.endswith("/close"):
+                    parts = path.split("/")
+                    item_id = int(parts[3])
+                    record_id = int(parts[5])
+                    self._json(200, service.close_record(item_id, record_id, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/transition"):
                     item_id = int(path.split("/")[3])
                     target = body.get("target")
                     expected = body.get("expected_version")
+                    traffic_ref = body.get("traffic_ref")
                     self._json(200, service.transition(
-                        item_id, target, expected, actor, role))
+                        item_id, target, expected, actor, role, traffic_ref))
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:

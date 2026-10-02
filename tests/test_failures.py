@@ -16,6 +16,9 @@ class FailureTest(unittest.TestCase):
         self.service.add_record(self.item["id"],payload,"recorder",'sensor_operator')
         with self.assertRaises(ConflictError): self.service.add_record(self.item["id"],payload,"recorder",'sensor_operator')
         current=self.service.get_item(self.item["id"],"viewer")
-        for target in STATES[1:-1]: current=self.service.transition(current["id"],target,current["version"],"reviewer",TRANSITION_ROLES[target][0])
+        self.service.add_record(self.item["id"],{"kind":"traffic_announcement","detail":"traffic control","status":"open","external_ref":"TA-1"},"recorder",'bridge_engineer')
+        for target in STATES[1:-1]:
+            traffic_ref="TA-1" if target in ("restricted","closed") else None
+            current=self.service.transition(current["id"],target,current["version"],"reviewer",TRANSITION_ROLES[target][0],traffic_ref)
         with self.assertRaises(ConflictError): self.service.transition(current["id"],STATES[-1],current["version"],"reviewer",TRANSITION_ROLES[STATES[-1]][0])
 if __name__=="__main__": unittest.main()
